@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+pandas
+sqlalchemy 
+passlib
+torch 
+torchvision 
+torchaudio
+langchain 
+langchain-openai
+scikit-learn
+bcrypt
+chromadb
+python-dotenv
+langchain_community
+sse-starlette 25.1.1
