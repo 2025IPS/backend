@@ -18,22 +18,28 @@ class MenuRecommendInput(BaseModel):
 @router.post("/menu-recommend")
 def recommend_menu(input_data: MenuRecommendInput):
     try:
-        # 예산 필터 설정
+        # 예산 필터 설정 (최소~최대 가격 설정)
         if "1만원 미만" in input_data.budget:
-            price_limit = 10000
+            price_min = 0
+            price_max = 10000
         elif "1~2만원" in input_data.budget:
-            price_limit = 20000
+            price_min = 10000
+            price_max = 20000
         elif "2~3만원" in input_data.budget:
-            price_limit = 30000
+            price_min = 20000
+            price_max = 30000
         elif "3~4만원" in input_data.budget:
-            price_limit = 40000
+            price_min = 30000
+            price_max = 40000
         else:
-            price_limit = 999999
+            price_min = 0
+            price_max = 999999
 
-        # 필터 적용
+        # 필터 적용 (최소 이상 최대 이하인 메뉴만 필터링)
         filtered = menu_df[
             (menu_df["region"] == input_data.region) &
-            (menu_df["menu_price"] <= price_limit)
+            (menu_df["menu_price"] >= price_min) &
+            (menu_df["menu_price"] <= price_max)
         ]
 
         if filtered.empty:
@@ -68,3 +74,4 @@ def recommend_menu(input_data: MenuRecommendInput):
             "address": "-",
             "url": "-"
         }
+
