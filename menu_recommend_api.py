@@ -9,6 +9,11 @@ router = APIRouter()
 
 # 데이터 로드
 menu_df = pd.read_csv("./data/final_menu_data.csv")
+
+# menu_price를 int로 변환 → ⭐ 오류 방지용 추가
+menu_df["menu_price"] = menu_df["menu_price"].astype(int)
+
+# 알러지 데이터 처리
 menu_df["allergy"] = menu_df["allergy"].apply(lambda x: [] if pd.isna(x) else [a.strip() for a in x.split(",")])
 
 # 지병 위험 키워드 매핑
@@ -80,7 +85,7 @@ def no_menu_response(msg):
 def recommend_menu(input_data: MenuRecommendInput):
     try:
         # 예산 필터링
-        price_min, price_max = 0, 999999
+        price_min, price_max = 0, 99999999
 
         if "1만원 미만" in input_data.budget:
             price_max = 10000
@@ -90,6 +95,8 @@ def recommend_menu(input_data: MenuRecommendInput):
             price_min, price_max = 20000, 30000
         elif "3~4만원" in input_data.budget:
             price_min, price_max = 30000, 40000
+        elif "4만원 이상" in input_data.budget:
+            price_min, price_max = 40000, 99999999  # 4만원 이상 처리 추가
 
         # 지역 + 예산 필터링
         filtered = menu_df[

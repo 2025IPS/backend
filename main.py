@@ -27,7 +27,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 📌 Router 등록
+# Router 등록
 app.include_router(register_router, tags=["auth"])                   # 회원가입/로그인
 app.include_router(improved_ai_router, tags=["ai-recommend"])        # 개선된 AI 추천
 app.include_router(chatbot_router, tags=["chatbot"])                 # 챗봇 기반 대화
@@ -41,4 +41,4 @@ app.include_router(llm_recommend_router, prefix="/api", tags=["llm-streaming"]) 
 # 헬스 체크용 기본 라우트
 @app.get("/")
 def read_root():
-    return {"message": "오늘의 먹방은 백엔드 정상 동작 중 🚀"}
+    return {"message": "오늘의 먹방은 백엔드 정상 동작 중"}

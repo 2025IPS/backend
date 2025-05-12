@@ -52,3 +52,25 @@ def update_mypage(data: MypageUpdateRequest, db: Session = Depends(get_db)):
     db.commit()
 
     return {"msg": "마이페이지 정보가 저장되었습니다."}
+
+# ---------------------------
+# 마이페이지 선호/비선호 정보 조회 API
+# ---------------------------
+@mypage_router.get("/mypage/{username}")
+def get_user_preferences(username: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    preferences = db.query(UserPreference).filter(UserPreference.user_id == user.id).all()
+
+    likes = [p.menu_name for p in preferences if p.preference_type == "선호"]
+    dislikes = [p.menu_name for p in preferences if p.preference_type == "비선호"]
+
+    return {
+        "name": user.name,
+        "preferences": {
+            "likes": likes,
+            "dislikes": dislikes
+        }
+    }
