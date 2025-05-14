@@ -11,6 +11,8 @@ from menu_recommend_api import router as menu_recommend_router
 from review_api import router as review_router  # 선택적
 from mypage_api import mypage_router  # 선택적
 from llm_recommend_api import router as llm_recommend_router  # 쫩쫩이 LLM Streaming 추천
+from feedback_api import router as feedback_router
+
 
 app = FastAPI(
     title="오늘의 먹방은 API",
@@ -37,6 +39,7 @@ app.include_router(menu_recommend_router, prefix="/api", tags=["menu-recommend"]
 app.include_router(review_router, tags=["review"])                   # 리뷰 관리 (선택)
 app.include_router(mypage_router, tags=["mypage"])                   # 마이페이지 (선택)
 app.include_router(llm_recommend_router, prefix="/api", tags=["llm-streaming"])    # 쫩쫩이 스트리밍 기반 추천
+app.include_router(feedback_router, prefix="/api", tags=["feedback"]) 
 
 # 헬스 체크용 기본 라우트
 @app.get("/")

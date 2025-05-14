@@ -76,6 +76,15 @@ def llm_recommend(input_data: LLMRecommendRequest, db: Session = Depends(get_db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # 음식과 무관한 기분 입력 차단
+    irrelevant_keywords = ["심심", "뭐해", "ㅎㅇ", "하이", "안녕", "노잼", "ㅋㅋ", "ㅎㅎ", "hi", "hello", "bored"]
+    if input_data.mood and any(k in input_data.mood.lower() for k in irrelevant_keywords):
+        return {
+            "recommended_menu": "추천 불가",
+            "recommendation_reason": "저는 음식 추천만 도와드릴 수 있어요. 음식 관련 요청을 해주세요 :)",
+            "alternative_options": []
+        }
+    
     input_data.allergies = input_data.allergies or [a.allergy for a in user.allergies]
     input_data.diseases = input_data.diseases or [d.disease for d in user.diseases]
     input_data.preferences = input_data.preferences or [p.menu_name for p in user.preferences if p.preference_type == "선호"]
@@ -89,27 +98,30 @@ def llm_recommend(input_data: LLMRecommendRequest, db: Session = Depends(get_db)
     parser = PydanticOutputParser(pydantic_object=MenuRecommendation)
 
     prompt_template = ChatPromptTemplate.from_template("""
-[사용자 정보]
-- 사용자명: {username}
-- 알레르기: {allergies}
-- 질병: {diseases}
-- 선호 메뉴: {preferences}
-- 비선호 메뉴: {dislikes}
-- 날씨: {weather}
-- 혼밥 여부: {alone}
-- 예산: {budget}
-- 기분: {mood}
-- 이전 추천: {previous_recommendations}
+You are a helpful AI that recommends meals considering health conditions, allergies, preferences, mood, and weather.
 
-[관련 메뉴]
+[User Information]
+- Username: {username}
+- Allergies: {allergies}
+- Diseases: {diseases}
+- Preferences: {preferences}
+- Dislikes: {dislikes}
+- Weather: {weather}
+- Eating Alone: {alone}
+- Budget: {budget}
+- Mood: {mood}
+- Previous Recommendations: {previous_recommendations}
+
+[Relevant Menu Data]
 {menu_context}
 
-[지침]
-- 건강과 선호를 우선 고려하세요.
-- 알레르기 재료는 피하세요.
-- 예산과 날씨를 반영하세요.
-- 이전 추천은 피하세요.
-- 대체 옵션도 제시하세요.
+[Instructions]
+1. Avoid allergens and inappropriate ingredients for the user's health conditions.
+2. Consider their preferences, mood, budget, and weather.
+3. Do not recommend previous menus again.
+4. Recommend **one main menu** with a brief explanation (1–2 sentences).
+5. Also suggest **2–3 alternative options**.
+6. Follow the output format exactly as described below.
 
 {format_instructions}
 """)

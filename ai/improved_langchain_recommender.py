@@ -9,40 +9,30 @@ from langchain.schema import Document
 import os
 import json
 from typing import List, Optional
-
-# 모델과 세션 관련 임포트
 from models import User, SessionLocal
-
 from dotenv import load_dotenv
-import os
 
-# FastAPI Router
 router = APIRouter(prefix="/menu")
 
 load_dotenv()
 
-# API 키 로드
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY가 설정되지 않았습니다.")
 
-# Vector DB 경로
 MENU_DB_PATH = "./chroma_db/menu_db"
 
-# LLM 설정
 llm = ChatOpenAI(
     model_name="gpt-4o",
     temperature=0.7,
     openai_api_key=OPENAI_API_KEY
 )
 
-# 응답 모델
 class MenuRecommendation(BaseModel):
     recommended_menu: str
     recommendation_reason: str
     alternative_options: List[str]
 
-# 요청 모델
 class LLMRecommendRequest(BaseModel):
     username: str
     allergies: List[str] = []
@@ -55,7 +45,6 @@ class LLMRecommendRequest(BaseModel):
     mood: Optional[str] = None
     previous_recommendations: List[str] = []
 
-# DB 세션 의존성
 def get_db():
     db = SessionLocal()
     try:
@@ -63,7 +52,6 @@ def get_db():
     finally:
         db.close()
 
-# 메뉴 DB 초기화
 def initialize_menu_db():
     sample_menus = [
         {"name": "김치찌개", "ingredients": ["김치", "돼지고기", "두부"], "type": "한식", "price_range": "중간"},
@@ -75,7 +63,7 @@ def initialize_menu_db():
     ]
     documents = []
     for menu in sample_menus:
-        content = f"이름: {menu['name']}\n종류: {menu['type']}\n주요 재료: {', '.join(menu['ingredients'])}\n가격대: {menu['price_range']}"
+        content = f"Name: {menu['name']}\nType: {menu['type']}\nIngredients: {', '.join(menu['ingredients'])}\nPrice Range: {menu['price_range']}"
         doc = Document(page_content=content, metadata=menu)
         documents.append(doc)
 
@@ -84,7 +72,6 @@ def initialize_menu_db():
     db.persist()
     return db
 
-# Vector DB 로드
 try:
     menu_db = Chroma(persist_directory=MENU_DB_PATH, embedding_function=OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY))
 except:
@@ -97,6 +84,14 @@ def llm_recommend(input_data: LLMRecommendRequest, db: Session = Depends(get_db)
     user = db.query(User).filter(User.username == input_data.username).first()
     if not user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+
+    irrelevant_keywords = ["심심", "뭐해", "ㅎㅇ", "하이", "안녕", "노잼", "ㅋㅋ", "ㅎㅎ", "hi", "hello", "bored"]
+    if input_data.mood and any(k in input_data.mood.lower() for k in irrelevant_keywords):
+        return {
+            "recommended_menu": "추천 불가",
+            "recommendation_reason": "저는 음식 추천만 도와드릴 수 있어요. 음식 관련 요청을 해주세요 :)",
+            "alternative_options": []
+        }
 
     if not input_data.allergies:
         input_data.allergies = [a.allergy for a in user.allergies]
@@ -114,57 +109,59 @@ def llm_recommend(input_data: LLMRecommendRequest, db: Session = Depends(get_db)
     search_query = f"예산: {input_data.budget} 날씨: {input_data.weather} 선호: {', '.join(input_data.preferences)}"
     relevant_menus = menu_retriever.get_relevant_documents(search_query)
 
-    menu_context = "\n".join([f"메뉴 {i+1}: {doc.page_content}" for i, doc in enumerate(relevant_menus)])
+    menu_context = "\n".join([f"Menu {i+1}: {doc.page_content}" for i, doc in enumerate(relevant_menus)])
     parser = PydanticOutputParser(pydantic_object=MenuRecommendation)
 
     prompt_template = ChatPromptTemplate.from_template("""
-당신은 사용자의 상황과 건강 정보를 고려하여 최적의 메뉴를 추천하는 AI입니다.
+You are a smart, friendly AI assistant that recommends meals based on user data.
 
-[사용자 정보]
-사용자명: {username}
-알레르기: {allergies}
-질병: {diseases}
-선호 메뉴: {preferences}
-비선호 메뉴: {dislikes}
-날씨: {weather}
-혼밥 여부: {alone}
-예산: {budget}
-기분: {mood}
-이전 추천 메뉴: {previous_recommendations}
+[User Info]
+Username: {username}
+Allergies: {allergies}
+Diseases: {diseases}
+Likes: {preferences}
+Dislikes: {dislikes}
+Weather: {weather}
+Eating Alone: {alone}
+Budget: {budget}
+Mood: {mood}
+Previous Recommendations: {previous_recommendations}
 
-[관련 메뉴 정보]
+[Candidate Menus]
 {menu_context}
 
+[Instructions]
+- Recommend 1 best-fitting meal and explain briefly why it's suitable (1–2 sentences).
+- Suggest 2–3 alternative options.
+- Avoid allergens and health risks.
+- Do not repeat previously recommended menus.
+- Follow this JSON format exactly:
 {format_instructions}
 """)
 
     prompt = prompt_template.format(
         username=input_data.username,
-        allergies=", ".join(input_data.allergies) or "없음",
-        diseases=", ".join(input_data.diseases) or "없음",
-        preferences=", ".join(input_data.preferences) or "없음",
-        dislikes=", ".join(input_data.dislikes) or "없음",
+        allergies=", ".join(input_data.allergies) or "None",
+        diseases=", ".join(input_data.diseases) or "None",
+        preferences=", ".join(input_data.preferences) or "None",
+        dislikes=", ".join(input_data.dislikes) or "None",
         weather=input_data.weather,
         alone=input_data.alone,
         budget=input_data.budget,
-        mood=input_data.mood or "정보 없음",
-        previous_recommendations=", ".join(input_data.previous_recommendations) or "없음",
+        mood=input_data.mood or "Not specified",
+        previous_recommendations=", ".join(input_data.previous_recommendations) or "None",
         menu_context=menu_context,
         format_instructions=parser.get_format_instructions()
     )
 
     try:
         response = llm.invoke(prompt)
-
         if not response.content.strip():
             return {"recommended_menu": "추천 실패", "recommendation_reason": "AI 응답이 비어있습니다.", "alternative_options": []}
-
         parsed_response = parser.parse(response.content)
         return parsed_response.dict()
-
     except Exception as e:
         result_text = getattr(response, "content", "").strip() if 'response' in locals() else ""
-
         return {
             "recommended_menu": "추천 처리 중 오류 발생",
             "recommendation_reason": f"오류: {str(e)} | 응답 내용: {result_text}",
@@ -176,36 +173,32 @@ def record_user_feedback(feedback_data: dict, db: Session = Depends(get_db)):
     username = feedback_data.get("username")
     menu_name = feedback_data.get("menu_name")
     rating = feedback_data.get("rating")
-
     user = db.query(User).filter(User.username == username).first()
     if not user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-
     return {"status": "success", "message": "피드백이 성공적으로 저장되었습니다."}
 
 @router.post("/chat")
 def chat_with_menu_assistant(chat_data: dict):
     message = chat_data.get("message", "")
     chat_history = chat_data.get("history", [])
-
     context = "\n".join([f"User: {msg['user']}\nAssistant: {msg['assistant']}" for msg in chat_history[-5:]])
-
     chat_prompt = ChatPromptTemplate.from_template("""
-당신은 '오늘의 메뉴' 앱의 친절한 AI 비서입니다.
+You are the friendly and concise AI assistant of the 'Today's Menu' app.
 
-[이전 대화]
+[Conversation History]
 {context}
 
-[사용자 메시지]
+[User Message]
 {message}
 
-[지침]
-1. 음식 관련 질문에 친절하게 응답하세요.
-2. 메뉴 추천 요청 시 필요한 정보를 물어본 뒤 추천하세요.
-3. 건강과 기분을 고려하세요.
+[Instructions]
+- Answer only food-related or meal recommendation queries.
+- If the message is irrelevant (e.g., "I'm bored", "hello"), say: "I'm here to help with food recommendations. Please ask about meals."
+- If user asks for recommendations, ask about allergies, budget, and preferences first if missing.
+- Consider health and mood when suggesting meals.
+- Always keep responses under 3 sentences.
 """)
-
     prompt = chat_prompt.format(context=context, message=message)
     response = llm.invoke(prompt)
-
     return {"response": response.content}

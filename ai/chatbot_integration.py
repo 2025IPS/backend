@@ -30,26 +30,30 @@ class MenuRecommendationSystem:
             model_name="gpt-4o", 
             temperature=0.7, 
             api_key=api_key,
-            streaming=True  # 스트리밍 활성화
+            streaming=True
         )
         self.conversation_stores = {}
-        
-        # 프롬프트 템플릿 수정: 변수 이름 통일
+
+        # 프롬프트 템플릿 개선
         self.prompt_template = ChatPromptTemplate.from_messages([
-            ("system", """당신은 음식 추천 전문가입니다. 사용자의 상황과 정보를 고려하여 최적의 메뉴를 추천해주세요.
+            ("system", '''
+You are the AI food recommendation assistant of the "Today's Menu" app.
 
-사용자 정보: {user_profile}
-현재 날씨: {weather}
+[Role]
+- You respond only to food- or meal-related questions.
+- Consider the user's profile, weather, and mood to recommend suitable meals.
+- If the input is unrelated to food (e.g., "I'm bored", "hi"), respond with: "I'm here to help with food recommendations. Please ask a food-related question."
 
-추천 규칙:
-1. 날씨와 상황에 맞는 음식 추천
-2. 예산과 인원수 고려
-3. 혼밥에 적합한 음식 추천
-4. 비오는 날에는 따뜻하고 포근한 음식 위주로 추천
-5. 추천 메뉴는 구체적이고 실제 주문 가능한 메뉴로 제시
+[Response Rules]
+- Recommend 2–3 specific dishes and briefly explain each (1–2 sentences per item).
+- Keep your total response within 3 sentences.
+- Use real, concrete food names rather than generic suggestions.
 
-형식: 추천 메뉴들을 자연스러운 대화체로 설명해주세요.
-"""),
+[Input]
+User Profile: {user_profile}
+Current Weather: {weather}
+User Message: {input}
+'''),
             MessagesPlaceholder(variable_name="history"),
             ("human", "{input}")
         ])
@@ -61,7 +65,6 @@ class MenuRecommendationSystem:
 
     def create_conversation_chain(self):
         chain = self.prompt_template | self.llm
-        
         return RunnableWithMessageHistory(
             chain,
             self.get_session_history,
@@ -80,39 +83,38 @@ async def llm_recommend_stream(
 ):
     try:
         conversation = recommendation_system.create_conversation_chain()
-        
+
         async def generate():
             try:
-                # situation을 input으로 전달
+                # 사전 필터링: 무의미한 요청 방지
+                irrelevant_keywords = ["심심", "뭐해", "ㅎㅇ", "하이", "안녕", "노잼", "ㅋㅋ", "ㅎㅎ", "hi", "hello", "bored"]
+                if any(k in situation.lower() for k in irrelevant_keywords):
+                    yield f"data: 저는 음식 추천만 도와드릴 수 있어요. 음식 관련 질문을 해주세요 :)\n\n"
+                    yield f"data: [END]\n\n"
+                    return
+
                 response_generator = conversation.astream(
                     {
-                        "input": situation,  # situation이 input으로 들어가야 함
+                        "input": situation,
                         "user_profile": user_profile,
                         "weather": weather
                     },
                     config={"configurable": {"session_id": "streaming_session"}}
                 )
-                
-                # 응답 스트리밍
+
                 async for chunk in response_generator:
-                    if hasattr(chunk, 'content'):
-                        content = chunk.content
-                    else:
-                        content = str(chunk)
-                    
-                    # 청크 전송
+                    content = chunk.content if hasattr(chunk, 'content') else str(chunk)
                     yield f"data: {content}\n\n"
-                
-                # 종료 신호
+
                 yield f"data: [END]\n\n"
-                
+
             except Exception as e:
                 print(f"Streaming error: {str(e)}")
                 import traceback
                 traceback.print_exc()
                 yield f"data: 추천 중 오류가 발생했어요. 다시 시도해 주세요.\n\n"
                 yield f"data: [END]\n\n"
-        
+
         return StreamingResponse(
             generate(),
             media_type="text/event-stream",
@@ -122,16 +124,16 @@ async def llm_recommend_stream(
                 "Content-Type": "text/event-stream",
             }
         )
-    
+
     except Exception as e:
         print(f"General error: {str(e)}")
         import traceback
         traceback.print_exc()
-        
+
         async def error_response():
             yield f"data: 서버 오류가 발생했습니다.\n\n"
             yield f"data: [END]\n\n"
-        
+
         return StreamingResponse(
             error_response(),
             media_type="text/event-stream",

@@ -86,23 +86,29 @@ def recommend_menu(req: RecommendRequest, db: Session = Depends(get_db)):
     parser = PydanticOutputParser(pydantic_object=MenuRecommendation)
 
     prompt = ChatPromptTemplate.from_template("""
-[사용자 정보]
-- 사용자명: {username}
-- 알레르기: {allergies}
-- 질병: {diseases}
-- 선호 메뉴: {preferences}
-- 비선호 메뉴: {dislikes}
-- 날씨: {weather}
-- 혼밥 여부: {alone}
-- 예산: {budget}
-- 기분: {mood}
-- 이전 추천 메뉴: {previous_recommendations}
+You are an AI assistant that recommends food menus based on user preferences, allergies, health conditions, and context.
 
-[관련 메뉴 정보]
+[User Information]
+- Username: {username}
+- Allergies: {allergies}
+- Diseases: {diseases}
+- Preferences: {preferences}
+- Dislikes: {dislikes}
+- Weather: {weather}
+- Eating Alone: {alone}
+- Budget: {budget}
+- Mood: {mood}
+- Previous Recommendations: {previous_recommendations}
+
+[Related Menu Data]
 {menu_context}
 
-[지침]
-알레르기와 건강상태를 최우선으로 고려하고 날씨, 혼밥 여부, 예산 등을 종합해 메뉴를 추천하세요.
+[Instructions]
+1. Prioritize allergies and diseases when selecting food.
+2. Consider mood, budget, and weather in the recommendation.
+3. Recommend one best menu with a short reason (1–2 sentences).
+4. Suggest 2–3 alternative options.
+5. Use the format exactly as below.
 
 {format_instructions}
 """)

@@ -63,14 +63,21 @@ def get_user_preferences(username: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="User not found")
 
     preferences = db.query(UserPreference).filter(UserPreference.user_id == user.id).all()
+    allergies = db.query(UserAllergy).filter(UserAllergy.user_id == user.id).all()
+    diseases = db.query(UserDisease).filter(UserDisease.user_id == user.id).all()
 
     likes = [p.menu_name for p in preferences if p.preference_type == "선호"]
     dislikes = [p.menu_name for p in preferences if p.preference_type == "비선호"]
+    allergy_list = [a.allergy for a in allergies]
+    disease_list = [d.disease for d in diseases]
 
     return {
         "name": user.name,
         "preferences": {
             "likes": likes,
-            "dislikes": dislikes
+            "dislikes": dislikes,
+            "allergies": allergy_list,
+            "diseases": disease_list
         }
     }
+

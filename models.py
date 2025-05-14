@@ -1,5 +1,7 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, Text, create_engine
 from sqlalchemy.orm import relationship, declarative_base, sessionmaker
+from datetime import datetime
+from sqlalchemy import DateTime  
 
 Base = declarative_base()
 
@@ -98,6 +100,19 @@ class Review(Base):
     restaurant = relationship("Restaurant", back_populates="reviews")
     menu = relationship("Menu", back_populates="reviews")
 
+# -------------------- 피드백 --------------------
+class Feedback(Base):
+    __tablename__ = "feedback"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    place_name = Column(String, nullable=False)
+    menu_name = Column(String, nullable=False)
+    feedback = Column(String, nullable=False)  # "good" or "bad"
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", backref="feedbacks")
+
 
 # -------------------- DB 연결 설정 --------------------
 DATABASE_URL = "sqlite:///./test.db"  # SQLite
@@ -107,3 +122,4 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # 테이블 생성
 Base.metadata.create_all(bind=engine)
+
