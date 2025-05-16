@@ -19,14 +19,17 @@ from ai.langchain_recommender import recommend_menu as llm_recommend_menu
 
 app = FastAPI(title="오늘의 먹방은 API", version="1.0.0")
 
-# CORS 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://192.168.219.102:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # 라우터 등록
 app.include_router(register_router, tags=["auth"])

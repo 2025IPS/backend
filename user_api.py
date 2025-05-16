@@ -1,9 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from models import User, UserAllergy, UserDisease, UserPreference, SessionLocal
+from pydantic import BaseModel
 
+# FastAPI Router 설정
 router = APIRouter()
 
+# DB 세션 생성 함수
 def get_db():
     db = SessionLocal()
     try:
@@ -11,6 +14,22 @@ def get_db():
     finally:
         db.close()
 
+# 전체 사용자 간단 정보 응답 모델
+class UserSimple(BaseModel):
+    id: int
+    name: str
+    username: str
+
+    class Config:
+        orm_mode = True
+
+# 전체 사용자 목록 조회 API
+@router.get("/users/all", response_model=list[UserSimple])
+def get_all_users(db: Session = Depends(get_db)):
+    users = db.query(User).all()
+    return users
+
+# 개별 사용자 상세 정보 조회 API
 @router.get("/user/{username}")
 def get_user_info(username: str, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == username).first()
