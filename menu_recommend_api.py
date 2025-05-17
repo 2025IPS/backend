@@ -10,8 +10,10 @@ router = APIRouter()
 # 데이터 로드
 menu_df = pd.read_csv("./data/final_menu_data.csv")
 
-# menu_price를 int로 변환 → ⭐ 오류 방지용 추가
+# menu_price를 int로 변환 → 오류 방지용 추가
 menu_df["menu_price"] = menu_df["menu_price"].astype(int)
+menu_df["region"] = menu_df["region"].str.strip()  # 꼭 추가!
+
 
 # 알러지 데이터 처리
 menu_df["allergy"] = menu_df["allergy"].apply(lambda x: [] if pd.isna(x) else [a.strip() for a in x.split(",")])

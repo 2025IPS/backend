@@ -27,7 +27,7 @@ def create_app():
         CORSMiddleware,
         allow_origins=[
             "http://localhost:3000",
-            "http://192.168.219.102:3000",  # ← 실제 핸드폰에서 접속 중인 프론트 주소
+            "http://192.168.219.105:3000",  # ← 실제 핸드폰에서 접속 중인 프론트 주소
         ],
         allow_credentials=True,
         allow_methods=["*"],
