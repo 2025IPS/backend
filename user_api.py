@@ -2,6 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from models import User, UserAllergy, UserDisease, UserPreference, SessionLocal
 from pydantic import BaseModel
+from typing import Optional
+from fastapi import Query
+from typing import Optional
 
 # FastAPI Router 설정
 router = APIRouter()
@@ -17,7 +20,7 @@ def get_db():
 # 전체 사용자 간단 정보 응답 모델
 class UserSimple(BaseModel):
     id: int
-    name: str
+    name: Optional[str] = None
     username: str
 
     class Config:
@@ -48,3 +51,12 @@ def get_user_info(username: str, db: Session = Depends(get_db)):
         "prefers": prefers,
         "dislikes": dislikes,
     }
+
+@router.get("/users/search", response_model=list[UserSimple])
+def search_users(keyword: str = Query(...), db: Session = Depends(get_db)):
+    # 대소문자 무시 + 부분 매칭 (`ilike`) 사용
+    keyword_like = f"%{keyword}%"
+    users = db.query(User).filter(
+        (User.username.ilike(keyword_like)) | (User.name.ilike(keyword_like))
+    ).all()
+    return users

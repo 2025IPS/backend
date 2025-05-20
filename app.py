@@ -16,6 +16,7 @@ from backend.register import router as register_router
 from backend.llm_recommend_api import router as llm_recommend_router  # Streaming LLM용
 from models import User, SessionLocal
 from ai.langchain_recommender import recommend_menu as llm_recommend_menu
+from feedback_api import router as feedback_router 
 
 app = FastAPI(title="오늘의 먹방은 API", version="1.0.0")
 
@@ -24,6 +25,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://192.168.219.102:3000",
+        "http://172.20.26.206:3000",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -31,15 +33,16 @@ app.add_middleware(
 )
 
 
-# 라우터 등록
+# ✅ 라우터 등록 (prefix 주의)
 app.include_router(register_router, tags=["auth"])
 app.include_router(mypage_router, tags=["mypage"])
-app.include_router(review_router, tags=["review"])
+app.include_router(review_router, prefix="/api", tags=["review"])  # ✅ 수정됨
 app.include_router(rule_recommend_router, prefix="/api", tags=["rule-recommend"])
 app.include_router(llm_router, tags=["llm"])
 app.include_router(llm_recommend_router, prefix="/api", tags=["llm-streaming"])
+app.include_router(feedback_router, prefix="/api", tags=["feedback"]) 
 
-# 비밀번호 암호화
+# 비밀번호 암호화 설정
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # DB 세션 의존성
@@ -53,7 +56,6 @@ def get_db():
 # -------------------------------
 # 회원가입 API
 # -------------------------------
-
 class UserCreate(BaseModel):
     username: str
     password: str
@@ -74,7 +76,6 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 # -------------------------------
 # 로그인 API
 # -------------------------------
-
 class UserLogin(BaseModel):
     username: str
     password: str
@@ -90,7 +91,6 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
 # -------------------------------
 # Rule 기반 추천 API
 # -------------------------------
-
 class RecommendRequest(BaseModel):
     username: str
     weather: str
@@ -121,7 +121,6 @@ def recommend(request: RecommendRequest, db: Session = Depends(get_db)):
 # -------------------------------
 # AI 기반 추천 (PyTorch)
 # -------------------------------
-
 class RecommendInput(BaseModel):
     user_data: list
 
@@ -162,7 +161,6 @@ def ai_recommend(input_data: RecommendInput):
 # -------------------------------
 # LLM LangChain 기반 추천
 # -------------------------------
-
 class ChatRecommendRequest(BaseModel):
     query: str
 
@@ -172,9 +170,8 @@ def llm_recommend(request: ChatRecommendRequest):
     return {"recommendation": result}
 
 # -------------------------------
-# 기본 헬스 체크
+# 헬스 체크
 # -------------------------------
-
 @app.get("/")
 def health_check():
     return {"message": "오늘의 먹방은 API 정상 동작 중 🚀"}

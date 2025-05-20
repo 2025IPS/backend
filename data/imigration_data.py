@@ -1,53 +1,29 @@
 import pandas as pd
-import re
 
-# 데이터 불러오기
-menu_df = pd.read_csv("./data/청파동_menu_price.csv")
-store_df = pd.read_csv("./data/청파동식당.csv")
+# 1. 기존 CSV 로드
+menu_df = pd.read_csv("C:/TodayMenu/backend/data/final_menu_data.csv")
 
-# 컬럼명 확인 후 address 컬럼 강제 지정 (중요!!!)
-if "address" not in store_df.columns:
-    # 만약 컬럼이 '주소' 라면 변경
-    if "주소" in store_df.columns:
-        store_df = store_df.rename(columns={"주소": "address"})
-    else:
-        raise ValueError(f"store_df 컬럼에 address 또는 주소가 없습니다. 현재 컬럼들: {store_df.columns}")
+# 2. 질병 키워드 정의
+disease_avoid_keywords = {
+    "고혈압": ["짠", "간", "국", "찌개", "탕", "면", "김치", "라면", "햄", "소금", "장"],
+    "당뇨": ["케이크", "초콜릿", "떡볶이", "아이스크림", "설탕", "달콤", "디저트", "단호박"],
+    "신장질환": ["국", "찌개", "라면", "햄", "소시지", "된장", "소금", "짠", "나트륨"]
+}
 
-# 지역(region) 추출 함수
-def extract_region(address):
-    match = re.search(r"용산구\s([^\s]+)", str(address))
-    if match:
-        dong = match.group(1)
-        if "청파" in dong:
-            return "청파동"
-        elif "갈월" in dong:
-            return "갈월동"
-        elif "효창" in dong:
-            return "효창동"
-        elif "남영" in dong:
-            return "남영동"
-        else:
-            return dong
-    return "기타"
+# 3. disease_risk 분류 함수 정의
+def classify_menu_disease_risks(menu_df, disease_avoid_keywords):
+    menu_df['disease_risk'] = [[] for _ in range(len(menu_df))]
+    for idx, menu in menu_df.iterrows():
+        risks = []
+        for disease, keywords in disease_avoid_keywords.items():
+            if any(keyword in str(menu['menu_name']) for keyword in keywords):
+                risks.append(disease)
+        menu_df.at[idx, 'disease_risk'] = risks
+    return menu_df
 
-# store_df에 region 컬럼 추가
-store_df["region"] = store_df["address"].apply(extract_region)
+# 4. 적용
+menu_df = classify_menu_disease_risks(menu_df, disease_avoid_keywords)
 
-# 메뉴 데이터 컬럼 정리
-menu_df.columns = ["place_name", "category", "menu_name", "weather", "menu_price"]
-menu_df["menu_price"] = menu_df["menu_price"].apply(lambda x: int(float(x)) if pd.notna(x) else None)
-
-# 가게 데이터 병합
-merged_df = pd.merge(menu_df, store_df, left_on="place_name", right_on="name", how="left")
-
-# allergy 컬럼 추가
-merged_df["allergy"] = ""
-
-# 최종 데이터 정리
-final_df = merged_df[[
-    "place_name", "region", "menu_name", "menu_price", "address", "url", "allergy"
-]]
-
-# 저장
-final_df.to_csv("./data/청파_menu_data.csv", index=False, encoding="utf-8-sig")
-print("최종 효창 메뉴 데이터 저장 완료")
+# 5. 저장
+menu_df.to_csv("C:/TodayMenu/backend/data/final_menu_with_risk.csv", index=False)
+print("✅ disease_risk 추가 완료 및 저장 완료!")

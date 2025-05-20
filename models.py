@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, Text, create_engine
 from sqlalchemy.orm import relationship, declarative_base, sessionmaker
 from datetime import datetime
-from sqlalchemy import DateTime  
+from sqlalchemy import DateTime
 
 Base = declarative_base()
 
@@ -20,7 +20,7 @@ class User(Base):
     diseases = relationship("UserDisease", back_populates="user", cascade="all, delete-orphan")
     preferences = relationship("UserPreference", back_populates="user", cascade="all, delete-orphan")
     reviews = relationship("Review", back_populates="user", cascade="all, delete-orphan")
-
+    feedbacks = relationship("Feedback", back_populates="user", cascade="all, delete-orphan")
 
 # -------------------- 알레르기 --------------------
 class UserAllergy(Base):
@@ -32,7 +32,6 @@ class UserAllergy(Base):
 
     user = relationship("User", back_populates="allergies")
 
-
 # -------------------- 지병 --------------------
 class UserDisease(Base):
     __tablename__ = "user_disease"
@@ -43,18 +42,16 @@ class UserDisease(Base):
 
     user = relationship("User", back_populates="diseases")
 
-
 # -------------------- 음식 취향 --------------------
 class UserPreference(Base):
     __tablename__ = "user_preference"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
-    preference_type = Column(String)  # 좋아요 / 싫어요
+    preference_type = Column(String)  # "좋아요" or "싫어요"
     menu_name = Column(String)
 
     user = relationship("User", back_populates="preferences")
-
 
 # -------------------- 메뉴 --------------------
 class Menu(Base):
@@ -67,9 +64,9 @@ class Menu(Base):
     category = Column(String)
     weather = Column(String)
     allergy = Column(String)
+    restaurant_id = Column(Integer)  # ← 이 줄 추가
 
     reviews = relationship("Review", back_populates="menu", cascade="all, delete-orphan")
-
 
 # -------------------- 음식점 --------------------
 class Restaurant(Base):
@@ -83,7 +80,6 @@ class Restaurant(Base):
 
     reviews = relationship("Review", back_populates="restaurant", cascade="all, delete-orphan")
 
-
 # -------------------- 리뷰 --------------------
 class Review(Base):
     __tablename__ = "reviews"
@@ -93,7 +89,7 @@ class Review(Base):
     restaurant_id = Column(Integer, ForeignKey("restaurants.id"))
     menu_id = Column(Integer, ForeignKey("menus.id"))
     rating = Column(Integer)
-    tags = Column(String)  # "가성비, 빨리 나와요" 등 문자열로 저장
+    tags = Column(String)  # 예: "가성비, 빠름"
     comment = Column(Text)
 
     user = relationship("User", back_populates="reviews")
@@ -102,7 +98,7 @@ class Review(Base):
 
 # -------------------- 피드백 --------------------
 class Feedback(Base):
-    __tablename__ = "feedback"
+    __tablename__ = "menu_feedback"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
@@ -111,15 +107,30 @@ class Feedback(Base):
     feedback = Column(String, nullable=False)  # "good" or "bad"
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    user = relationship("User", backref="feedbacks")
+    # ✅ 리뷰 기능을 위한 menu_id / restaurant_id 포함
+    menu_id = Column(Integer, nullable=True)
+    restaurant_id = Column(Integer, nullable=True)
+
+    user = relationship("User", back_populates="feedbacks")
+
+class RecommendationHistory(Base):
+    __tablename__ = "recommendation_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    place_name = Column(String)
+    menu_name = Column(String)
+    menu_id = Column(Integer)
+    restaurant_id = Column(Integer)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 # -------------------- DB 연결 설정 --------------------
-DATABASE_URL = "sqlite:///./test.db"  # SQLite
+DATABASE_URL = "sqlite:///./test.db"
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# 테이블 생성
+# ✅ 테이블 생성
 Base.metadata.create_all(bind=engine)
 
